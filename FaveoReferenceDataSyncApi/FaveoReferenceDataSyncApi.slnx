@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/Apps/">
+    <Project Path="FaveoReferenceDataSyncApi.API/FaveoReferenceDataSyncApi.API.csproj" />
+  </Folder>
+</Solution>
