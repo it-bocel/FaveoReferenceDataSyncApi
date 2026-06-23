@@ -48,6 +48,15 @@ public sealed class EmployeeCatalogController(IEmployeeCatalogService employeeCa
         return Ok(areas);
     }
 
+
+    [HttpGet("positions")]
+    [ProducesResponseType(typeof(IReadOnlyList<PositionCatalogItem>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<PositionCatalogItem>>> GetPositions(CancellationToken cancellationToken)
+    {
+        var positions = await employeeCatalogService.GetPositionsAsync(cancellationToken);
+        return Ok(positions);
+    }
+
     [HttpGet("secciones-departamentos")]
     [ProducesResponseType(typeof(IReadOnlyList<SeccionDepartamentoCatalogItem>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<SeccionDepartamentoCatalogItem>>> GetSeccionesDepartamentos(CancellationToken cancellationToken)

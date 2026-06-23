@@ -1,11 +1,22 @@
+using FaveoReferenceDataSyncApi.API.Jobs;
 using FaveoReferenceDataSyncApi.API.Models;
+using FaveoReferenceDataSyncApi.API.Models.Sync;
 using FaveoReferenceDataSyncApi.API.Services;
+using FaveoReferenceDataSyncApi.API.Services.Sync;
+using Hangfire;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Host.UseWindowsService(options =>
+{
+    options.ServiceName = "Faveo Reference Data Sync API";
+});
+
 builder.Services.Configure<TicketFormApiOptions>(
     builder.Configuration.GetSection(TicketFormApiOptions.SectionName));
+builder.Services.Configure<SyncCacheOptions>(
+    builder.Configuration.GetSection(SyncCacheOptions.SectionName));
 
 // Add services to the container.
 
@@ -16,6 +27,13 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddOpenApi();
 
 builder.Services.AddScoped<IEmployeeCatalogService, EmployeeCatalogService>();
+builder.Services.AddScoped<ITicketFormSyncJob, TicketFormSyncJob>();
+builder.Services.AddSingleton<ISyncCacheStore, FileSyncCacheStore>();
+builder.Services.AddScoped<ITicketFormApiClient, TicketFormApiClient>();
+builder.Services.AddSingleton<IJobFileLogger, DailyFileJobLogger>();
+
+builder.Services.AddHangfire(configuration => configuration.UseInMemoryStorage());
+builder.Services.AddHangfireServer();
 
 builder.Services.AddHttpClient("TicketFormApi", (serviceProvider, client) =>
 {
@@ -23,7 +41,7 @@ builder.Services.AddHttpClient("TicketFormApi", (serviceProvider, client) =>
 
     if (!string.IsNullOrWhiteSpace(options.Url))
     {
-        client.BaseAddress = new Uri(options.Url);
+        client.BaseAddress = new Uri(options.Url.EndsWith("/", StringComparison.Ordinal) ? options.Url : options.Url + "/");
     }
 
     if (!string.IsNullOrWhiteSpace(options.ApiKey))
@@ -43,9 +61,15 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
 
+app.UseHangfireDashboard("/hangfire");
+
 app.MapControllers();
+
+RecurringJob.AddOrUpdate<ITicketFormSyncJob>(
+    "ticket-form-reference-data-sync",
+    job => job.RunAsync(),
+    Cron.Daily(20));
 
 app.Run();

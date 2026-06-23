@@ -39,6 +39,7 @@ public sealed class EmployeeCatalogService(IConfiguration configuration) : IEmpl
     private static readonly string LocalidadesQuery = BuildCatalogQuery("RIGHT(F.descripcion, 8)", "Localidad");
     private static readonly string LineasQuery = BuildCatalogQuery("C.descripcion", "Linea");
     private static readonly string AreasQuery = BuildCatalogQuery("G.descripcion", "Area");
+    private static readonly string PositionsQuery = BuildCatalogQuery("B.descripcion", "Posición");
     private static readonly string SeccionesDepartamentosQuery = BuildCatalogQuery("D.descripcion", "Sección(Dept)");
 
     private readonly string _connectionString = configuration.GetConnectionString("DefaultConnection")
@@ -87,6 +88,9 @@ public sealed class EmployeeCatalogService(IConfiguration configuration) : IEmpl
 
     public Task<IReadOnlyList<AreaCatalogItem>> GetAreasAsync(CancellationToken cancellationToken) =>
         QueryCatalogAsync(AreasQuery, "Area", value => new AreaCatalogItem { Area = value }, cancellationToken);
+
+    public Task<IReadOnlyList<PositionCatalogItem>> GetPositionsAsync(CancellationToken cancellationToken) =>
+        QueryCatalogAsync(PositionsQuery, "Posición", value => new PositionCatalogItem { Posicion = value }, cancellationToken);
 
     public Task<IReadOnlyList<SeccionDepartamentoCatalogItem>> GetSeccionesDepartamentosAsync(CancellationToken cancellationToken) =>
         QueryCatalogAsync(SeccionesDepartamentosQuery, "Sección(Dept)", value => new SeccionDepartamentoCatalogItem { SeccionDept = value }, cancellationToken);

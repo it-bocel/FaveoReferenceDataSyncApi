@@ -14,5 +14,7 @@ public interface IEmployeeCatalogService
 
     Task<IReadOnlyList<AreaCatalogItem>> GetAreasAsync(CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<PositionCatalogItem>> GetPositionsAsync(CancellationToken cancellationToken);
+
     Task<IReadOnlyList<SeccionDepartamentoCatalogItem>> GetSeccionesDepartamentosAsync(CancellationToken cancellationToken);
 }
