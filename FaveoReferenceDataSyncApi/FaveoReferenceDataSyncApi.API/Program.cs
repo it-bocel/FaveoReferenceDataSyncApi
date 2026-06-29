@@ -5,6 +5,7 @@ using FaveoReferenceDataSyncApi.API.Services;
 using FaveoReferenceDataSyncApi.API.Services.Sync;
 using Hangfire;
 using Microsoft.Extensions.Options;
+using NLog.Web;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,10 @@ builder.Host.UseWindowsService(options =>
 {
     options.ServiceName = "Faveo Reference Data Sync API";
 });
+
+builder.Logging.ClearProviders();
+builder.Logging.SetMinimumLevel(LogLevel.Trace);
+builder.Host.UseNLog();
 
 builder.Services.Configure<TicketFormApiOptions>(
     builder.Configuration.GetSection(TicketFormApiOptions.SectionName));

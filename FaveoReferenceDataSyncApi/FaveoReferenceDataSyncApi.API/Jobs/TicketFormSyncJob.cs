@@ -28,6 +28,8 @@ public sealed class TicketFormSyncJob(
             var cache = await syncCacheStore.LoadAsync(cancellationToken);
             var employees = await employeeCatalogService.GetEmployeesAsync(cancellationToken);
             var sentEmployees = 0;
+            var newEmployees = 0;
+            var modifiedEmployees = 0;
             var skippedEmployees = 0;
             var failedEmployees = 0;
 
@@ -45,9 +47,9 @@ public sealed class TicketFormSyncJob(
 
                 var employeeKey = NormalizeKey(payload.Codigo);
                 var payloadHash = ComputeHash(payload);
+                var syncDecision = GetEmployeeSyncDecision(cache, employeeKey, payloadHash);
 
-                if (cache.Employees.TryGetValue(employeeKey, out var cachedEmployee)
-                    && cachedEmployee.PayloadHash == payloadHash)
+                if (syncDecision == EmployeeSyncDecision.Unchanged)
                 {
                     skippedEmployees++;
                     continue;
@@ -56,6 +58,16 @@ public sealed class TicketFormSyncJob(
                 try
                 {
                     await ticketFormApiClient.SendEmployeeAsync(payload, cancellationToken);
+
+                    if (syncDecision == EmployeeSyncDecision.Modified)
+                    {
+                        modifiedEmployees++;
+                    }
+                    else
+                    {
+                        newEmployees++;
+                    }
+
                     cache.Employees[employeeKey] = new CachedEmployeeItem
                     {
                         PayloadHash = payloadHash,
@@ -66,7 +78,7 @@ public sealed class TicketFormSyncJob(
                 catch (Exception ex)
                 {
                     failedEmployees++;
-                    var message = string.Concat("Failed to send employee ", payload.Codigo, " - ", payload.NombreEmpleado, ".");
+                    var message = string.Concat("Failed to send employee ", payload.Codigo, " - ", payload.NombreEmpleado, ". It will be retried in the next sync run.");
                     logger.LogError(ex, "{Message}", message);
                     await jobFileLogger.WriteAsync(message, ex, cancellationToken);
                 }
@@ -76,8 +88,10 @@ public sealed class TicketFormSyncJob(
 
             var completedMessage = string.Concat(
                 "Ticket form employee sync completed. Sent employees: ", sentEmployees,
+                ". New employees: ", newEmployees,
+                ". Modified employees: ", modifiedEmployees,
                 ". Skipped employees: ", skippedEmployees,
-                ". Failed employees: ", failedEmployees, ".");
+                ". Failed employees pending retry: ", failedEmployees, ".");
 
             logger.LogInformation("{Message}", completedMessage);
 
@@ -88,6 +102,18 @@ public sealed class TicketFormSyncJob(
             logger.LogError(ex, "Ticket form employee sync failed with an unexpected error.");
             await jobFileLogger.WriteAsync("Ticket form employee sync failed with an unexpected error.", ex, cancellationToken);
         }
+    }
+
+    private static EmployeeSyncDecision GetEmployeeSyncDecision(SyncCacheState cache, string employeeKey, string payloadHash)
+    {
+        if (!cache.Employees.TryGetValue(employeeKey, out var cachedEmployee))
+        {
+            return EmployeeSyncDecision.New;
+        }
+
+        return cachedEmployee.PayloadHash == payloadHash
+            ? EmployeeSyncDecision.Unchanged
+            : EmployeeSyncDecision.Modified;
     }
 
     private static TicketFormEmployeePayload? TryCreateEmployeePayload(EmployeeCatalogItem employee)
@@ -124,5 +150,12 @@ public sealed class TicketFormSyncJob(
         var json = JsonSerializer.Serialize(value, JsonOptions);
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
         return Convert.ToHexString(bytes);
+    }
+
+    private enum EmployeeSyncDecision
+    {
+        New,
+        Modified,
+        Unchanged
     }
 }
